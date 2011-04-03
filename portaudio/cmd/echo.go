@@ -1,12 +1,12 @@
 package main
 
-import "portaudio-go.googlecode.com/hg/portaudio"
 import (
+	"portaudio-go.googlecode.com/hg/portaudio"
 	"time"
 )
 
 func main() {
-	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 4096, callback)
+	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 4096, new(Echoer))
 	if err != nil { panic(err.Text) }
 	defer stream.Close()
 	err = stream.Start()
@@ -17,7 +17,8 @@ func main() {
 }
 
 var buffer []float32 = make([]float32, 4096)
-func callback(inputBuffer, outputBuffer []float32) {
+type Echoer int
+func (*Echoer) ProcessAudio(inputBuffer, outputBuffer []float32) {
 	for i := range outputBuffer {
 		outputBuffer[i] = .7*buffer[i]
 	}

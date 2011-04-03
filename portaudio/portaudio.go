@@ -47,17 +47,19 @@ type Error struct {
 	Text string
 }
 
-type StreamCallback func(inputBuffer, outputBuffer []float32)
+type AudioProcessor interface {
+	ProcessAudio(inputBuffer, outputBuffer []float32)
+}
 
 type Stream struct {
 	paStream unsafe.Pointer
 	closed bool
-	callback StreamCallback
+	audioProcessor AudioProcessor
 }
 
 func OpenDefaultStream(numInputChannels, numOutputChannels int,
 						sampleRate float64, framesPerBuffer int,
-						callback StreamCallback) (*Stream, *Error) {
+						audioProcessor AudioProcessor) (*Stream, *Error) {
 	error := C.Pa_Initialize()
 	if error != C.paNoError {
 		return nil, &Error{C.GoString(C.Pa_GetErrorText(error))}
@@ -68,7 +70,7 @@ func OpenDefaultStream(numInputChannels, numOutputChannels int,
 	if error != C.paNoError {
 		return nil, &Error{C.GoString(C.Pa_GetErrorText(error))}
 	}
-	stream.callback = callback
+	stream.audioProcessor = audioProcessor
 	return stream, nil
 }
 
@@ -93,7 +95,7 @@ func streamCallback(arg unsafe.Pointer) {
 	context := (*C.context)(arg)
 	stream := (*Stream)(context.stream)
 	frameCount := (int)(context.frameCount)
-	stream.callback(sliceAt(context.inputBuffer, frameCount), sliceAt(context.outputBuffer, frameCount))
+	stream.audioProcessor.ProcessAudio(sliceAt(context.inputBuffer, frameCount), sliceAt(context.outputBuffer, frameCount))
 	context.ret = C.paContinue
 }
 

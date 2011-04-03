@@ -1,13 +1,13 @@
 package main
 
-import "portaudio-go.googlecode.com/hg/portaudio"
 import (
+	"portaudio-go.googlecode.com/hg/portaudio"
 	"time"
 	"rand"
 )
 
 func main() {
-	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 128, callback)
+	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 128, new(NoiseGenerator))
 	if err != nil { panic(err.Text) }
 	defer stream.Close()
 	err = stream.Start()
@@ -17,7 +17,8 @@ func main() {
 	if err != nil { panic(err.Text) }
 }
 
-func callback(inputBuffer, outputBuffer []float32) {
+type NoiseGenerator int
+func (*NoiseGenerator) ProcessAudio(inputBuffer, outputBuffer []float32) {
 	for i := range outputBuffer {
 		outputBuffer[i] = .1*(2*rand.Float32() - 1)
 	}
