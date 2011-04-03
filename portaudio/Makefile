@@ -1,6 +1,6 @@
 include $(GOROOT)/src/Make.inc
 
-TARG=portaudio
+TARG=portaudio-go.googlecode.com/hg/portaudio
 CGOFILES=portaudio.go
 CGO_LDFLAGS=-lportaudio
 
