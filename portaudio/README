@@ -1,0 +1,5 @@
+This package provides an interface to the PortAudio audio I/O library (http://www.portaudio.com/).
+
+Currently, a version of OpenDefaultStream is supported; it returns a Stream that can be started and stopped.  Only float32 samples are currently supported.  This should be sufficient for many basic uses.  If people express interest, I'll be glad to expand the interface.
+
+The client receives and sends audio via a callback function, made possible by Roger Peppe's callback package (http://code.google.com/p/rog-go/source/browse/exp/callback).
