@@ -1,1 +1,3 @@
 portaudio/_cgo_export\.h
+portaudio/cmd/echo
+portaudio/cmd/noise
