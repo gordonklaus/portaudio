@@ -28,5 +28,5 @@ func (e *Echoer) ProcessAudio(inputBuffer, outputBuffer []float32) {
 	for i := range outputBuffer {
 		outputBuffer[i] = .7*e.buffer[i]
 	}
-	e.buffer = inputBuffer
+	copy(e.buffer, inputBuffer)
 }
