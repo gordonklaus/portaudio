@@ -1,35 +1,38 @@
 package portaudio
 
-//#include <portaudio.h>
-//
-//typedef struct context context;
-//struct context {
-//	void *stream;
-//	const void *inputBuffer;
-//	void *outputBuffer;
-//	unsigned long frameCount;
-//	int ret;
-//};
-//
-//extern void streamCallback(void*);
-//
-//// callbackFunc holds the callback library function.
-//// It is stored in a function pointer because C linkage
-//// does not work across packages.
-//static void(*callbackFunc)(void (*f)(void*), void*);
-//
-//void setCallbackFunc(void *cb){ callbackFunc = cb; }
-//
-//int paStreamCallback(const void *inputBuffer, void *outputBuffer, unsigned long frameCount
-//		, const PaStreamCallbackTimeInfo *timeInfo
-//		, PaStreamCallbackFlags statusFlags
-//		, void *userData) {
-//	context context = { userData, inputBuffer, outputBuffer, frameCount };
-//	callbackFunc(streamCallback, &context);
-//	return context.ret;
-//}
-//
-//PaStreamCallback* getPaStreamCallback() { return paStreamCallback; }
+/*
+#cgo LDFLAGS: -lportaudio
+#include <portaudio.h>
+
+typedef struct context context;
+struct context {
+	void *stream;
+	const void *inputBuffer;
+	void *outputBuffer;
+	unsigned long frameCount;
+	int ret;
+};
+
+extern void streamCallback(void*);
+
+// callbackFunc holds the callback library function.
+// It is stored in a function pointer because C linkage
+// does not work across packages.
+static void(*callbackFunc)(void (*f)(void*), void*);
+
+void setCallbackFunc(void *cb){ callbackFunc = cb; }
+
+int paStreamCallback(const void *inputBuffer, void *outputBuffer, unsigned long frameCount
+		, const PaStreamCallbackTimeInfo *timeInfo
+		, PaStreamCallbackFlags statusFlags
+		, void *userData) {
+	context context = { userData, inputBuffer, outputBuffer, frameCount };
+	callbackFunc(streamCallback, &context);
+	return context.ret;
+}
+
+PaStreamCallback* getPaStreamCallback() { return paStreamCallback; }
+*/
 import "C"
 
 import (
