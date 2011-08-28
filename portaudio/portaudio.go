@@ -87,7 +87,7 @@ func (s *Stream) Start() *Error {
 
 func sliceAt(buffer unsafe.Pointer, size int) []float32 {
 	if buffer == nil { return nil }
-	slice := (*[1<<30]float32)(buffer)[:size]
+	slice := (*[1<<30 - 1]float32)(buffer)[:size]
 	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&slice))
 	sliceHeader.Cap = size
 	return slice
