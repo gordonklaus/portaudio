@@ -6,22 +6,18 @@ import (
 )
 
 func main() {
-	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 4096, NewEchoer())
-	if err != nil { panic(err.Text) }
+	chk := func(err error) { if err != nil { panic(err) } }
+	bufferSize := 4096
+	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, bufferSize, &Echoer{make([]float32, bufferSize)})
+	chk(err)
 	defer stream.Close()
-	err = stream.Start()
-	if err != nil { panic(err.Text) }
+	chk(stream.Start())
 	time.Sleep(4e9)
-	err = stream.Stop()
-	if err != nil { panic(err.Text) }
+	chk(stream.Stop())
 }
 
 type Echoer struct {
 	buffer []float32
-}
-
-func NewEchoer() *Echoer {
-	return &Echoer{make([]float32, 4096)}
 }
 
 func (e *Echoer) ProcessAudio(inputBuffer, outputBuffer []float32) {

@@ -14,7 +14,7 @@ int paStreamCallback(const void *inputBuffer, void *outputBuffer, unsigned long 
 		, void *userData) {
 	context context = { userData, inputBuffer, outputBuffer, frameCount };
 	callbackFunc(streamCallback, &context);
-	return context.ret;
+	return paContinue;
 }
 
 PaStreamCallback* getPaStreamCallback() { return paStreamCallback; }

@@ -10,7 +10,6 @@ struct context {
 	const void *inputBuffer;
 	void *outputBuffer;
 	unsigned long frameCount;
-	int ret;
 };
 
 // from pa.c

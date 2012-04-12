@@ -10,15 +10,11 @@ import (
 	"code.google.com/p/rog-go/exp/callback"
 	"unsafe"
 	"reflect"
-	"log"
+	"errors"
 )
 
 func init() {
 	C.setCallbackFunc(callback.Func)
-}
-
-type Error struct {
-	Text string
 }
 
 type AudioProcessor interface {
@@ -31,27 +27,30 @@ type Stream struct {
 	audioProcessor AudioProcessor
 }
 
+func newError(err C.PaError) error {
+	return errors.New(C.GoString(C.Pa_GetErrorText(err)))
+}
+
 func OpenDefaultStream(numInputChannels, numOutputChannels int,
 						sampleRate float64, framesPerBuffer int,
-						audioProcessor AudioProcessor) (*Stream, *Error) {
-	error := C.Pa_Initialize()
-	if error != C.paNoError {
-		return nil, &Error{C.GoString(C.Pa_GetErrorText(error))}
+						audioProcessor AudioProcessor) (*Stream, error) {
+	err := C.Pa_Initialize()
+	if err != C.paNoError {
+		return nil, newError(err)
 	}
 	
-	stream := &Stream{}
-	error = C.Pa_OpenDefaultStream(&stream.paStream, C.int(numInputChannels), C.int(numOutputChannels), C.paFloat32, C.double(sampleRate), C.ulong(framesPerBuffer), C.getPaStreamCallback(), unsafe.Pointer(stream))
-	if error != C.paNoError {
-		return nil, &Error{C.GoString(C.Pa_GetErrorText(error))}
+	stream := &Stream{audioProcessor:audioProcessor}
+	err = C.Pa_OpenDefaultStream(&stream.paStream, C.int(numInputChannels), C.int(numOutputChannels), C.paFloat32, C.double(sampleRate), C.ulong(framesPerBuffer), C.getPaStreamCallback(), unsafe.Pointer(stream))
+	if err != C.paNoError {
+		return nil, newError(err)
 	}
-	stream.audioProcessor = audioProcessor
 	return stream, nil
 }
 
-func (s *Stream) Start() *Error {
-	error := C.Pa_StartStream(s.paStream)
-	if error != C.paNoError {
-		return &Error{C.GoString(C.Pa_GetErrorText(error))}
+func (s *Stream) Start() error {
+	err := C.Pa_StartStream(s.paStream)
+	if err != C.paNoError {
+		return newError(err)
 	}
 	return nil
 }
@@ -70,32 +69,23 @@ func streamCallback(arg unsafe.Pointer) {
 	stream := (*Stream)(context.stream)
 	frameCount := (int)(context.frameCount)
 	stream.audioProcessor.ProcessAudio(sliceAt(context.inputBuffer, frameCount), sliceAt(context.outputBuffer, frameCount))
-	context.ret = C.paContinue
 }
 
-func (s *Stream) Stop() *Error {
-	error := C.Pa_StopStream(s.paStream)
-	if error != C.paNoError {
-		return &Error{C.GoString(C.Pa_GetErrorText(error))}
+func (s *Stream) Stop() error {
+	err := C.Pa_StopStream(s.paStream)
+	if err != C.paNoError {
+		return newError(err)
 	}
 	return nil
 }
 
-func (s *Stream) Close() *Error {
+func (s *Stream) Close() error {
 	if !s.closed {
 		s.closed = true
-		error := C.Pa_Terminate()
-		if error != C.paNoError {
-			return &Error{C.GoString(C.Pa_GetErrorText(error))}
+		err := C.Pa_Terminate()
+		if err != C.paNoError {
+			return newError(err)
 		}
 	}
 	return nil
-}
-
-// not actually called for finalization, yet (but planned to do so in a future Go release)
-func (s *Stream) destroy() {
-	error := s.Close()
-	if error != nil {
-		log.Print("Stream.Close() failed in Stream.destroy()")
-	}
 }

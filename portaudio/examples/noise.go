@@ -7,14 +7,13 @@ import (
 )
 
 func main() {
+	chk := func(err error) { if err != nil { panic(err) } }
 	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 128, new(NoiseGenerator))
-	if err != nil { panic(err.Text) }
+	chk(err)
 	defer stream.Close()
-	err = stream.Start()
-	if err != nil { panic(err.Text) }
+	chk(stream.Start())
 	time.Sleep(1e9)
-	err = stream.Stop()
-	if err != nil { panic(err.Text) }
+	chk(stream.Stop())
 }
 
 type NoiseGenerator int
