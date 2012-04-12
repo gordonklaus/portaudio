@@ -2,41 +2,12 @@ package portaudio
 
 /*
 #cgo LDFLAGS: -lportaudio
-#include <portaudio.h>
-
-typedef struct context context;
-struct context {
-	void *stream;
-	const void *inputBuffer;
-	void *outputBuffer;
-	unsigned long frameCount;
-	int ret;
-};
-
-extern void streamCallback(void*);
-
-// callbackFunc holds the callback library function.
-// It is stored in a function pointer because C linkage
-// does not work across packages.
-static void(*callbackFunc)(void (*f)(void*), void*);
-
-void setCallbackFunc(void *cb){ callbackFunc = cb; }
-
-int paStreamCallback(const void *inputBuffer, void *outputBuffer, unsigned long frameCount
-		, const PaStreamCallbackTimeInfo *timeInfo
-		, PaStreamCallbackFlags statusFlags
-		, void *userData) {
-	context context = { userData, inputBuffer, outputBuffer, frameCount };
-	callbackFunc(streamCallback, &context);
-	return context.ret;
-}
-
-PaStreamCallback* getPaStreamCallback() { return paStreamCallback; }
+#include "pa.h"
 */
 import "C"
 
 import (
-	"rog-go.googlecode.com/hg/exp/callback"
+	"code.google.com/p/rog-go/exp/callback"
 	"unsafe"
 	"reflect"
 	"log"
@@ -87,7 +58,7 @@ func (s *Stream) Start() *Error {
 
 func sliceAt(buffer unsafe.Pointer, size int) []float32 {
 	if buffer == nil { return nil }
-	slice := (*[1<<30 - 1]float32)(buffer)[:size]
+	slice := (*[1<<29 - 1]float32)(buffer)[:size]
 	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&slice))
 	sliceHeader.Cap = size
 	return slice

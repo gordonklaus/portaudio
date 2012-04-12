@@ -1,9 +1,9 @@
 package main
 
 import (
-	"portaudio-go.googlecode.com/hg/portaudio"
+	"code.google.com/p/portaudio-go/portaudio"
 	"time"
-	"rand"
+	"math/rand"
 )
 
 func main() {
