@@ -8,7 +8,7 @@ import (
 
 func main() {
 	chk := func(err error) { if err != nil { panic(err) } }
-	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, 128, new(NoiseGenerator))
+	stream, err := portaudio.OpenDefaultStream(0, 1, 44100, 128, noiseGenerator{})
 	chk(err)
 	defer stream.Close()
 	chk(stream.Start())
@@ -16,9 +16,9 @@ func main() {
 	chk(stream.Stop())
 }
 
-type NoiseGenerator int
-func (*NoiseGenerator) ProcessAudio(inputBuffer, outputBuffer []float32) {
-	for i := range outputBuffer {
-		outputBuffer[i] = .1*(2*rand.Float32() - 1)
+type noiseGenerator struct{}
+func (noiseGenerator) ProcessAudio(_, out [][]float32) {
+	for i := range out[0] {
+		out[0][i] = .1 * (2 * rand.Float32() - 1)
 	}
 }

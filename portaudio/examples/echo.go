@@ -8,7 +8,7 @@ import (
 func main() {
 	chk := func(err error) { if err != nil { panic(err) } }
 	bufferSize := 4096
-	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, bufferSize, &Echoer{make([]float32, bufferSize)})
+	stream, err := portaudio.OpenDefaultStream(1, 1, 44100, bufferSize, &echoer{make([]float32, bufferSize)})
 	chk(err)
 	defer stream.Close()
 	chk(stream.Start())
@@ -16,13 +16,13 @@ func main() {
 	chk(stream.Stop())
 }
 
-type Echoer struct {
+type echoer struct {
 	buffer []float32
 }
 
-func (e *Echoer) ProcessAudio(inputBuffer, outputBuffer []float32) {
-	for i := range outputBuffer {
-		outputBuffer[i] = .7*e.buffer[i]
+func (e *echoer) ProcessAudio(in, out [][]float32) {
+	for i := range out[0] {
+		out[0][i] = .7*e.buffer[i]
 	}
-	copy(e.buffer, inputBuffer)
+	copy(e.buffer, in[0])
 }

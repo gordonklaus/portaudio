@@ -17,11 +17,15 @@ func init() {
 	C.setCallbackFunc(callback.Func)
 }
 
+// An AudioProcessor reads input buffers and writes output buffers.
+// len(inputs) == numInputChannels, len(outputs) == numOutputChannels,
+// and len(inputs[i]) == len(outputs[j]) == framesPerBuffer
 type AudioProcessor interface {
-	ProcessAudio(inputBuffer, outputBuffer []float32)
+	ProcessAudio(inputs, outputs [][]float32)
 }
 
 type Stream struct {
+	numInputChannels, numOutputChannels int
 	paStream unsafe.Pointer
 	closed bool
 	audioProcessor AudioProcessor
@@ -39,8 +43,8 @@ func OpenDefaultStream(numInputChannels, numOutputChannels int,
 		return nil, newError(err)
 	}
 	
-	stream := &Stream{audioProcessor:audioProcessor}
-	err = C.Pa_OpenDefaultStream(&stream.paStream, C.int(numInputChannels), C.int(numOutputChannels), C.paFloat32, C.double(sampleRate), C.ulong(framesPerBuffer), C.getPaStreamCallback(), unsafe.Pointer(stream))
+	stream := &Stream{numInputChannels, numOutputChannels, nil, false, audioProcessor}
+	err = C.Pa_OpenDefaultStream(&stream.paStream, C.int(numInputChannels), C.int(numOutputChannels), C.paFloat32 | C.paNonInterleaved, C.double(sampleRate), C.ulong(framesPerBuffer), C.getPaStreamCallback(), unsafe.Pointer(stream))
 	if err != C.paNoError {
 		return nil, newError(err)
 	}
@@ -55,20 +59,29 @@ func (s *Stream) Start() error {
 	return nil
 }
 
+//export streamCallback
+func streamCallback(arg unsafe.Pointer) {
+	context := (*C.context)(arg)
+	stream := (*Stream)(context.stream)
+	frameCount := (int)(context.frameCount)
+	stream.audioProcessor.ProcessAudio(channels(context.inputBuffer, stream.numInputChannels, frameCount), channels(context.outputBuffer, stream.numOutputChannels, frameCount))
+}
+
+func channels(buffers unsafe.Pointer, numChans int, frameCount int) [][]float32 {
+	bufs := (*[1<<29 - 1]unsafe.Pointer)(buffers)
+	c := make([][]float32, numChans)
+	for i := 0; i < numChans; i++ {
+		c[i] = sliceAt(bufs[i], frameCount)
+	}
+	return c
+}
+
 func sliceAt(buffer unsafe.Pointer, size int) []float32 {
 	if buffer == nil { return nil }
 	slice := (*[1<<29 - 1]float32)(buffer)[:size]
 	sliceHeader := (*reflect.SliceHeader)(unsafe.Pointer(&slice))
 	sliceHeader.Cap = size
 	return slice
-}
-
-//export streamCallback
-func streamCallback(arg unsafe.Pointer) {
-	context := (*C.context)(arg)
-	stream := (*Stream)(context.stream)
-	frameCount := (int)(context.frameCount)
-	stream.audioProcessor.ProcessAudio(sliceAt(context.inputBuffer, frameCount), sliceAt(context.outputBuffer, frameCount))
 }
 
 func (s *Stream) Stop() error {
