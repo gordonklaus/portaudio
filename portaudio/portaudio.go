@@ -68,11 +68,12 @@ func streamCallback(arg unsafe.Pointer) {
 }
 
 func channels(buffers unsafe.Pointer, n, frames int) [][]float32 {
-	var bufs []uintptr
-	*(*reflect.SliceHeader)(unsafe.Pointer(&bufs)) = reflect.SliceHeader{uintptr(buffers), n, n}
 	c := make([][]float32, n)
 	for i := range c {
-		*(*reflect.SliceHeader)(unsafe.Pointer(&c[i])) = reflect.SliceHeader{bufs[i], frames, frames}
+		hdr := (*reflect.SliceHeader)(unsafe.Pointer(&c[i]))
+		hdr.Data = *(*uintptr)(unsafe.Pointer(uintptr(buffers) + uintptr(i) * unsafe.Sizeof(uintptr(0))))
+		hdr.Len = frames
+		hdr.Cap = frames
 	}
 	return c
 }
