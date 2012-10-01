@@ -2,8 +2,8 @@ package main
 
 import (
 	"code.google.com/p/portaudio-go/portaudio"
-	"time"
 	"math/rand"
+	"time"
 )
 
 func main() {
@@ -17,8 +17,8 @@ func main() {
 }
 
 type noiseGenerator struct{}
-func (noiseGenerator) ProcessAudio(_, out [][]float32) {
-	for i := range out[0] {
-		out[0][i] = .1 * (2 * rand.Float32() - 1)
+func (noiseGenerator) ProcessAudio(_, out []uint8) {
+	for i := range out {
+		out[i] = uint8(rand.Uint32())
 	}
 }

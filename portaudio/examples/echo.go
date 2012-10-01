@@ -20,9 +20,9 @@ type echoer struct {
 	buffer []float32
 }
 
-func (e *echoer) ProcessAudio(in, out [][]float32) {
-	for i := range out[0] {
-		out[0][i] = .7*e.buffer[i]
+func (e *echoer) ProcessAudio(in, out []float32) {
+	for i := range out {
+		out[i] = .7 * e.buffer[i]
 	}
-	copy(e.buffer, in[0])
+	copy(e.buffer, in)
 }

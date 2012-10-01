@@ -14,7 +14,7 @@ func main() {
 	chk(err)
 	defer stream.Close()
 	chk(stream.Start())
-	time.Sleep(4 * time.Second)
+	time.Sleep(2 * time.Second)
 	chk(stream.Stop())
 }
 
