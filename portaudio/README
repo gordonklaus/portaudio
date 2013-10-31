@@ -1,5 +1,7 @@
-This package provides an interface to the PortAudio audio I/O library (http://www.portaudio.com/).
+This package provides an interface to the PortAudio audio I/O library (http://www.portaudio.com/).  See the package documentation for details.
 
 To build portaudio-go, you must first have the PortAudio development headers and libraries installed.  Some systems provide a package for this; e.g., on Ubuntu you would want to run `apt-get install portaudio19-dev`.  On other systems you might have to install from source.
 
-Currently, a version of OpenDefaultStream is supported; it returns a Stream that can be started and stopped.  All sample formats are supported (float32, int32, Int24, int16, int8, uint8) interleaved and non-interleaved.  If people express interest, I'll be glad to expand the interface.
+A previous version of OpenDefaultStream automatically called Initialize (and Stream.Close called Terminate).  This behavior no longer exists; clients must explicitly call Initialize before making any other calls (and finally Terminate).
+
+Thanks to sqweek for motivating and contributing to host API and device enumeration.

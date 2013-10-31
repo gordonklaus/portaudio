@@ -7,18 +7,24 @@ import (
 )
 
 func main() {
-	chk := func(err error) { if err != nil { panic(err) } }
-	stream, err := portaudio.OpenDefaultStream(0, 1, 44100, 128, noiseGenerator{})
+	portaudio.Initialize()
+	defer portaudio.Terminate()
+	h, err := portaudio.DefaultHostApi()
+	chk(err)
+	stream, err := portaudio.OpenStream(portaudio.HighLatencyParameters(nil, h.DefaultOutputDevice), func(out []int32) {
+		for i := range out {
+			out[i] = int32(rand.Uint32())
+		}
+	})
 	chk(err)
 	defer stream.Close()
 	chk(stream.Start())
-	time.Sleep(1e9)
+	time.Sleep(time.Second)
 	chk(stream.Stop())
 }
 
-type noiseGenerator struct{}
-func (noiseGenerator) ProcessAudio(_, out []uint8) {
-	for i := range out {
-		out[i] = uint8(rand.Uint32())
+func chk(err error) {
+	if err != nil {
+		panic(err)
 	}
 }
