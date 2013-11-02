@@ -6,10 +6,11 @@ import (
 	"text/template"
 )
 
-const tmpl = `{{. | len}} host APIs: {{range .}}
+var tmpl = template.Must(template.New("").Parse(
+	`{{. | len}} host APIs: {{range .}}
 	Name:                   {{.Name}}
-	Default input device:   {{.DefaultInputDevice.Name}}
-	Default output device:  {{.DefaultOutputDevice.Name}}
+	{{if .DefaultInputDevice}}Default input device:   {{.DefaultInputDevice.Name}}{{end}}
+	{{if .DefaultOutputDevice}}Default output device:  {{.DefaultOutputDevice.Name}}{{end}}
 	Devices: {{range .Devices}}
 		Name:                      {{.Name}}
 		MaxInputChannels:          {{.MaxInputChannels}}
@@ -20,16 +21,15 @@ const tmpl = `{{. | len}} host APIs: {{range .}}
 		DefaultHighOutputLatency:  {{.DefaultHighOutputLatency}}
 		DefaultSampleRate:         {{.DefaultSampleRate}}
 	{{end}}
-{{end}}`
+{{end}}`,
+))
 
 func main() {
 	portaudio.Initialize()
 	defer portaudio.Terminate()
 	hs, err := portaudio.HostApis()
 	chk(err)
-	t, err := template.New("").Parse(tmpl)
-	chk(err)
-	err = t.Execute(os.Stdout, hs)
+	err = tmpl.Execute(os.Stdout, hs)
 	chk(err)
 }
 
