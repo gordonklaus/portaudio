@@ -1,5 +1,5 @@
 /*
-For the most part, these bindings parallel the underlying PortAudio API; please refer to its documentation for details.  Differences introduced by the bindings are documented here:
+For the most part, these bindings parallel the underlying PortAudio API; please refer to http://www.portaudio.com/docs.html for details.  Differences introduced by the bindings are documented here:
 
 Instead of passing a flag to OpenStream, audio sample formats are inferred from the signature of the stream callback or, for a blocking stream, from the types of the buffers.  See the StreamCallback and Buffer types for details.
 
@@ -613,6 +613,9 @@ func (s *Stream) initCallback(p StreamParameters, fun reflect.Value) error {
 	}
 	if i < nArgs {
 		return fmt.Errorf("too many parameters in StreamCallback")
+	}
+	if t.NumOut() > 0 {
+		return fmt.Errorf("too many results in StreamCallback")
 	}
 	s.callback = fun
 	s.args = args
