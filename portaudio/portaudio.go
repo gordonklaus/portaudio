@@ -39,33 +39,33 @@ func (err Error) Error() string {
 
 const (
 	NotInitialized                        Error = C.paNotInitialized
-	InvalidChannelCount                         = C.paInvalidChannelCount
-	InvalidSampleRate                           = C.paInvalidSampleRate
-	InvalidDevice                               = C.paInvalidDevice
-	InvalidFlag                                 = C.paInvalidFlag
-	SampleFormatNotSupported                    = C.paSampleFormatNotSupported
-	BadIODeviceCombination                      = C.paBadIODeviceCombination
-	InsufficientMemory                          = C.paInsufficientMemory
-	BufferTooBig                                = C.paBufferTooBig
-	BufferTooSmall                              = C.paBufferTooSmall
-	NullCallback                                = C.paNullCallback
-	BadStreamPtr                                = C.paBadStreamPtr
-	TimedOut                                    = C.paTimedOut
-	InternalError                               = C.paInternalError
-	DeviceUnavailable                           = C.paDeviceUnavailable
-	IncompatibleHostApiSpecificStreamInfo       = C.paIncompatibleHostApiSpecificStreamInfo
-	StreamIsStopped                             = C.paStreamIsStopped
-	StreamIsNotStopped                          = C.paStreamIsNotStopped
-	InputOverflowed                             = C.paInputOverflowed
-	OutputUnderflowed                           = C.paOutputUnderflowed
-	HostApiNotFound                             = C.paHostApiNotFound
-	InvalidHostApi                              = C.paInvalidHostApi
-	CanNotReadFromACallbackStream               = C.paCanNotReadFromACallbackStream
-	CanNotWriteToACallbackStream                = C.paCanNotWriteToACallbackStream
-	CanNotReadFromAnOutputOnlyStream            = C.paCanNotReadFromAnOutputOnlyStream
-	CanNotWriteToAnInputOnlyStream              = C.paCanNotWriteToAnInputOnlyStream
-	IncompatibleStreamHostApi                   = C.paIncompatibleStreamHostApi
-	BadBufferPtr                                = C.paBadBufferPtr
+	InvalidChannelCount                   Error = C.paInvalidChannelCount
+	InvalidSampleRate                     Error = C.paInvalidSampleRate
+	InvalidDevice                         Error = C.paInvalidDevice
+	InvalidFlag                           Error = C.paInvalidFlag
+	SampleFormatNotSupported              Error = C.paSampleFormatNotSupported
+	BadIODeviceCombination                Error = C.paBadIODeviceCombination
+	InsufficientMemory                    Error = C.paInsufficientMemory
+	BufferTooBig                          Error = C.paBufferTooBig
+	BufferTooSmall                        Error = C.paBufferTooSmall
+	NullCallback                          Error = C.paNullCallback
+	BadStreamPtr                          Error = C.paBadStreamPtr
+	TimedOut                              Error = C.paTimedOut
+	InternalError                         Error = C.paInternalError
+	DeviceUnavailable                     Error = C.paDeviceUnavailable
+	IncompatibleHostApiSpecificStreamInfo Error = C.paIncompatibleHostApiSpecificStreamInfo
+	StreamIsStopped                       Error = C.paStreamIsStopped
+	StreamIsNotStopped                    Error = C.paStreamIsNotStopped
+	InputOverflowed                       Error = C.paInputOverflowed
+	OutputUnderflowed                     Error = C.paOutputUnderflowed
+	HostApiNotFound                       Error = C.paHostApiNotFound
+	InvalidHostApi                        Error = C.paInvalidHostApi
+	CanNotReadFromACallbackStream         Error = C.paCanNotReadFromACallbackStream
+	CanNotWriteToACallbackStream          Error = C.paCanNotWriteToACallbackStream
+	CanNotReadFromAnOutputOnlyStream      Error = C.paCanNotReadFromAnOutputOnlyStream
+	CanNotWriteToAnInputOnlyStream        Error = C.paCanNotWriteToAnInputOnlyStream
+	IncompatibleStreamHostApi             Error = C.paIncompatibleStreamHostApi
+	BadBufferPtr                          Error = C.paBadBufferPtr
 )
 
 type UnanticipatedHostError struct {
@@ -142,19 +142,19 @@ var hostApiStrings = [...]string{
 
 const (
 	InDevelopment   HostApiType = C.paInDevelopment
-	DirectSound                 = C.paDirectSound
-	MME                         = C.paMME
-	ASIO                        = C.paASIO
-	SoundManager                = C.paSoundManager
-	CoreAudio                   = C.paCoreAudio
-	OSS                         = C.paOSS
-	ALSA                        = C.paALSA
-	AL                          = C.paAL
-	BeOS                        = C.paBeOS
-	WDMkS                       = C.paWDMKS
-	JACK                        = C.paJACK
-	WASAPI                      = C.paWASAPI
-	AudioScienceHPI             = C.paAudioScienceHPI
+	DirectSound     HostApiType = C.paDirectSound
+	MME             HostApiType = C.paMME
+	ASIO            HostApiType = C.paASIO
+	SoundManager    HostApiType = C.paSoundManager
+	CoreAudio       HostApiType = C.paCoreAudio
+	OSS             HostApiType = C.paOSS
+	ALSA            HostApiType = C.paALSA
+	AL              HostApiType = C.paAL
+	BeOS            HostApiType = C.paBeOS
+	WDMkS           HostApiType = C.paWDMKS
+	JACK            HostApiType = C.paJACK
+	WASAPI          HostApiType = C.paWASAPI
+	AudioScienceHPI HostApiType = C.paAudioScienceHPI
 )
 
 type HostApiInfo struct {
@@ -259,15 +259,15 @@ var (
 func hostsAndDevices() ([]*HostApiInfo, []*DeviceInfo, error) {
 	if !cached {
 		nhosts := C.Pa_GetHostApiCount()
-		ndev := C.Pa_GetDeviceCount()
+		ndevs := C.Pa_GetDeviceCount()
 		if nhosts < 0 {
 			return nil, nil, newError(C.PaError(nhosts))
 		}
-		if ndev < 0 {
-			return nil, nil, newError(C.PaError(ndev))
+		if ndevs < 0 {
+			return nil, nil, newError(C.PaError(ndevs))
 		}
-		devices = make([]*DeviceInfo, ndev)
-		hosti := make([]C.PaHostApiIndex, ndev)
+		devices = make([]*DeviceInfo, ndevs)
+		hosti := make([]C.PaHostApiIndex, ndevs)
 		for i := range devices {
 			i := C.PaDeviceIndex(i)
 			paDev := C.Pa_GetDeviceInfo(i)
@@ -344,11 +344,11 @@ type StreamFlags C.PaStreamFlags
 
 const (
 	NoFlag                                StreamFlags = C.paNoFlag
-	ClipOff                                           = C.paClipOff
-	DitherOff                                         = C.paDitherOff
-	NeverDropInput                                    = C.paNeverDropInput
-	PrimeOutputBuffersUsingStreamCallback             = C.paPrimeOutputBuffersUsingStreamCallback
-	PlatformSpecificFlags                             = C.paPlatformSpecificFlags
+	ClipOff                               StreamFlags = C.paClipOff
+	DitherOff                             StreamFlags = C.paDitherOff
+	NeverDropInput                        StreamFlags = C.paNeverDropInput
+	PrimeOutputBuffersUsingStreamCallback StreamFlags = C.paPrimeOutputBuffersUsingStreamCallback
+	PlatformSpecificFlags                 StreamFlags = C.paPlatformSpecificFlags
 )
 
 /*
@@ -474,10 +474,10 @@ type StreamCallbackFlags C.PaStreamCallbackFlags
 
 const (
 	InputUnderflow  StreamCallbackFlags = C.paInputUnderflow
-	InputOverflow                       = C.paInputOverflow
-	OutputUnderflow                     = C.paOutputUnderflow
-	OutputOverflow                      = C.paOutputOverflow
-	PrimingOutput                       = C.paPrimingOutput
+	InputOverflow   StreamCallbackFlags = C.paInputOverflow
+	OutputUnderflow StreamCallbackFlags = C.paOutputUnderflow
+	OutputOverflow  StreamCallbackFlags = C.paOutputOverflow
+	PrimingOutput   StreamCallbackFlags = C.paPrimingOutput
 )
 
 /*
@@ -487,7 +487,7 @@ The args may consist of either a single StreamCallback or, for a blocking stream
 */
 func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if initialized <= 0 {
-		return nil, newError(C.paNotInitialized)
+		return nil, NotInitialized
 	}
 
 	s := &Stream{}
@@ -511,7 +511,7 @@ The args parameter has the same meaning as in OpenStream.
 */
 func OpenDefaultStream(numInputChannels, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (*Stream, error) {
 	if initialized <= 0 {
-		return nil, newError(C.paNotInitialized)
+		return nil, NotInitialized
 	}
 
 	var inDev, outDev *DeviceInfo
@@ -801,10 +801,10 @@ Read uses the buffer provided to OpenStream.  The number of samples to read is d
 */
 func (s *Stream) Read() error {
 	if s.callback.IsValid() {
-		return newError(CanNotReadFromACallbackStream)
+		return CanNotReadFromACallbackStream
 	}
 	if s.in == nil {
-		return newError(CanNotReadFromAnOutputOnlyStream)
+		return CanNotReadFromAnOutputOnlyStream
 	}
 	buf, frames, err := getBuffer(s.in, s.inParams)
 	if err != nil {
@@ -818,10 +818,10 @@ Write uses the buffer provided to OpenStream.  The number of samples to write is
 */
 func (s *Stream) Write() error {
 	if s.callback.IsValid() {
-		return newError(CanNotWriteToACallbackStream)
+		return CanNotWriteToACallbackStream
 	}
 	if s.out == nil {
-		return newError(CanNotWriteToAnInputOnlyStream)
+		return CanNotWriteToAnInputOnlyStream
 	}
 	buf, frames, err := getBuffer(s.out, s.outParams)
 	if err != nil {
