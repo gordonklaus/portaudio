@@ -18,7 +18,9 @@ import "C"
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"runtime"
 	"time"
 	"unsafe"
 )
@@ -717,6 +719,18 @@ func (s *Stream) Start() error {
 
 //export streamCallback
 func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, timeInfo *C.PaStreamCallbackTimeInfo, statusFlags C.PaStreamCallbackFlags, userData unsafe.Pointer) {
+	defer func() {
+		// Don't let PortAudio silently swallow panics.
+		if x := recover(); x != nil {
+			buf := make([]byte, 1<<10)
+			for runtime.Stack(buf, true) == len(buf) {
+				buf = make([]byte, 2*len(buf))
+			}
+			fmt.Fprintf(os.Stderr, "panic in portaudio stream callback: %s\n\n%s", x, buf)
+			os.Exit(2)
+		}
+	}()
+
 	s := (*Stream)(userData)
 	s.timeInfo = StreamCallbackTimeInfo{duration(timeInfo.inputBufferAdcTime), duration(timeInfo.currentTime), duration(timeInfo.outputBufferDacTime)}
 	s.flags = StreamCallbackFlags(statusFlags)
