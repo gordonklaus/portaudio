@@ -501,7 +501,9 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s))
+	stream_size := (C.size_t)(unsafe.Sizeof(s))
+	bs := (*Stream)(C.malloc(stream_size))
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(bs))
 	if paErr != C.paNoError {
 		return nil, newError(paErr)
 	}
