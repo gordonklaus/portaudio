@@ -12,6 +12,7 @@ package portaudio
 /*
 #cgo pkg-config: portaudio-2.0
 #include <portaudio.h>
+#include <stdlib.h>
 extern PaStreamCallback* paStreamCallback;
 */
 import "C"
@@ -492,7 +493,8 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 		return nil, NotInitialized
 	}
 
-	s := &Stream{}
+	stream_size := (C.size_t)(unsafe.Sizeof(Stream{}))
+	s := (*Stream)(C.malloc(stream_size))
 	err := s.init(p, args...)
 	if err != nil {
 		return nil, err
@@ -501,9 +503,7 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	stream_size := (C.size_t)(unsafe.Sizeof(s))
-	bs := (*Stream)(C.malloc(stream_size))
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(bs))
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s))
 	if paErr != C.paNoError {
 		return nil, newError(paErr)
 	}
@@ -710,8 +710,11 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 func (s *Stream) Close() error {
 	if !s.closed {
 		s.closed = true
-		return newError(C.Pa_CloseStream(s.paStream))
+		err := newError(C.Pa_CloseStream(s.paStream))
+		C.free(unsafe.Pointer(s))
+		return err
 	}
+	C.free(unsafe.Pointer(s))
 	return nil
 }
 
