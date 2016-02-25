@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -68,6 +69,12 @@ const (
 	CanNotWriteToAnInputOnlyStream        Error = C.paCanNotWriteToAnInputOnlyStream
 	IncompatibleStreamHostApi             Error = C.paIncompatibleStreamHostApi
 	BadBufferPtr                          Error = C.paBadBufferPtr
+)
+
+var (
+	mu         sync.Mutex
+	idToStream map[uintptr]*Stream = make(map[uintptr]*Stream)
+	curId      uintptr
 )
 
 type UnanticipatedHostError struct {
@@ -422,7 +429,7 @@ Returns nil if the format is supported, otherwise an error.
 The args parameter has the same meaning as in OpenStream.
 */
 func IsFormatSupported(p StreamParameters, args ...interface{}) error {
-	s := &Stream{}
+	s := NewStream()
 	err := s.init(p, args...)
 	if err != nil {
 		return err
@@ -433,6 +440,7 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 type Int24 [3]byte
 
 type Stream struct {
+	id                  uintptr
 	paStream            unsafe.Pointer
 	inParams, outParams *C.PaStreamParameters
 	in, out             *reflect.SliceHeader
@@ -441,6 +449,15 @@ type Stream struct {
 	args                []reflect.Value
 	callback            reflect.Value
 	closed              bool
+}
+
+func NewStream() *Stream {
+	s := &Stream{}
+	mu.Lock()
+	s.id = curId
+	curId++
+	mu.Unlock()
+	return s
 }
 
 /*
@@ -492,7 +509,7 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 		return nil, NotInitialized
 	}
 
-	s := &Stream{}
+	s := NewStream()
 	err := s.init(p, args...)
 	if err != nil {
 		return nil, err
@@ -501,7 +518,12 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s))
+
+	mu.Lock()
+	id := s.id
+	idToStream[s.id] = s
+	mu.Unlock()
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(id))
 	if paErr != C.paNoError {
 		return nil, newError(paErr)
 	}
@@ -706,6 +728,9 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 }
 
 func (s *Stream) Close() error {
+	mu.Lock()
+	delete(idToStream, s.id)
+	mu.Unlock()
 	if !s.closed {
 		s.closed = true
 		return newError(C.Pa_CloseStream(s.paStream))
@@ -731,7 +756,13 @@ func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, ti
 		}
 	}()
 
-	s := (*Stream)(userData)
+	id := uintptr(userData)
+	mu.Lock()
+	s := idToStream[id]
+	if s == nil {
+		panic("unregistered stream")
+	}
+	mu.Unlock()
 	s.timeInfo = StreamCallbackTimeInfo{duration(timeInfo.inputBufferAdcTime), duration(timeInfo.currentTime), duration(timeInfo.outputBufferDacTime)}
 	s.flags = StreamCallbackFlags(statusFlags)
 	updateBuffer(s.in, uintptr(inputBuffer), s.inParams, int(frames))
