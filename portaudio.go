@@ -71,12 +71,6 @@ const (
 	BadBufferPtr                          Error = C.paBadBufferPtr
 )
 
-var (
-	mu         sync.Mutex
-	idToStream map[uintptr]*Stream = make(map[uintptr]*Stream)
-	curId      uintptr
-)
-
 type UnanticipatedHostError struct {
 	HostApiType HostApiType
 	Code        int
@@ -429,7 +423,7 @@ Returns nil if the format is supported, otherwise an error.
 The args parameter has the same meaning as in OpenStream.
 */
 func IsFormatSupported(p StreamParameters, args ...interface{}) error {
-	s := NewStream()
+	s := &Stream{}
 	err := s.init(p, args...)
 	if err != nil {
 		return err
@@ -449,15 +443,6 @@ type Stream struct {
 	args                []reflect.Value
 	callback            reflect.Value
 	closed              bool
-}
-
-func NewStream() *Stream {
-	s := &Stream{}
-	mu.Lock()
-	s.id = curId
-	curId++
-	mu.Unlock()
-	return s
 }
 
 /*
@@ -509,20 +494,18 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 		return nil, NotInitialized
 	}
 
-	s := NewStream()
+	s := &Stream{}
 	err := s.init(p, args...)
 	if err != nil {
 		return nil, err
 	}
+
 	cb := C.paStreamCallback
 	if !s.callback.IsValid() {
 		cb = nil
 	}
 
-	mu.Lock()
-	id := s.id
-	idToStream[s.id] = s
-	mu.Unlock()
+	id := scm.Track(s)
 	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(id))
 	if paErr != C.paNoError {
 		return nil, newError(paErr)
@@ -728,9 +711,7 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 }
 
 func (s *Stream) Close() error {
-	mu.Lock()
-	delete(idToStream, s.id)
-	mu.Unlock()
+	scm.Untrack(s.id)
 	if !s.closed {
 		s.closed = true
 		return newError(C.Pa_CloseStream(s.paStream))
@@ -756,13 +737,7 @@ func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, ti
 		}
 	}()
 
-	id := uintptr(userData)
-	mu.Lock()
-	s := idToStream[id]
-	if s == nil {
-		panic("unregistered stream")
-	}
-	mu.Unlock()
+	s := scm.Get(uintptr(userData))
 	s.timeInfo = StreamCallbackTimeInfo{duration(timeInfo.inputBufferAdcTime), duration(timeInfo.currentTime), duration(timeInfo.outputBufferDacTime)}
 	s.flags = StreamCallbackFlags(statusFlags)
 	updateBuffer(s.in, uintptr(inputBuffer), s.inParams, int(frames))
@@ -901,4 +876,39 @@ func getBuffer(s *reflect.SliceHeader, p *C.PaStreamParameters) (unsafe.Pointer,
 		}
 		return unsafe.Pointer(&buf[0]), frames, nil
 	}
+}
+
+// StreamCMap tracks the pointers of the Streams between Go and CGO and was required as of the release of Go 1.6
+// "panic: runtime error: cgo argument has Go pointer to Go pointer"
+type StreamCMap struct {
+	sync.RWMutex
+	streams map[uintptr]*Stream
+	nextId  uintptr
+}
+
+var scm = &StreamCMap{streams: make(map[uintptr]*Stream), nextId: 0}
+
+func (scm *StreamCMap) Get(id uintptr) *Stream {
+	scm.RLock()
+	defer scm.RUnlock()
+	s := scm.streams[id]
+	if s == nil {
+		panic("unregistered stream")
+	}
+	return s
+}
+
+func (scm *StreamCMap) Track(s *Stream) uintptr {
+	scm.Lock()
+	defer scm.Unlock()
+	s.id = scm.nextId
+	scm.nextId++
+	scm.streams[s.id] = s
+	return s.id
+}
+
+func (scm *StreamCMap) Untrack(id uintptr) {
+	scm.Lock()
+	defer scm.Unlock()
+	delete(scm.streams, id)
 }
