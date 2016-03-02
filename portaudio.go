@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -433,6 +434,7 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 type Int24 [3]byte
 
 type Stream struct {
+	id                  uintptr
 	paStream            unsafe.Pointer
 	inParams, outParams *C.PaStreamParameters
 	in, out             *reflect.SliceHeader
@@ -497,11 +499,14 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	cb := C.paStreamCallback
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s))
+
+	id := scm.Track(s)
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(id))
 	if paErr != C.paNoError {
 		return nil, newError(paErr)
 	}
@@ -706,6 +711,7 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 }
 
 func (s *Stream) Close() error {
+	scm.Untrack(s.id)
 	if !s.closed {
 		s.closed = true
 		return newError(C.Pa_CloseStream(s.paStream))
@@ -731,7 +737,7 @@ func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, ti
 		}
 	}()
 
-	s := (*Stream)(userData)
+	s := scm.Get(uintptr(userData))
 	s.timeInfo = StreamCallbackTimeInfo{duration(timeInfo.inputBufferAdcTime), duration(timeInfo.currentTime), duration(timeInfo.outputBufferDacTime)}
 	s.flags = StreamCallbackFlags(statusFlags)
 	updateBuffer(s.in, uintptr(inputBuffer), s.inParams, int(frames))
@@ -870,4 +876,39 @@ func getBuffer(s *reflect.SliceHeader, p *C.PaStreamParameters) (unsafe.Pointer,
 		}
 		return unsafe.Pointer(&buf[0]), frames, nil
 	}
+}
+
+// StreamCMap tracks the pointers of the Streams between Go and CGO and was required as of the release of Go 1.6
+// "panic: runtime error: cgo argument has Go pointer to Go pointer"
+type StreamCMap struct {
+	sync.RWMutex
+	streams map[uintptr]*Stream
+	nextId  uintptr
+}
+
+var scm = &StreamCMap{streams: make(map[uintptr]*Stream), nextId: 0}
+
+func (scm *StreamCMap) Get(id uintptr) *Stream {
+	scm.RLock()
+	defer scm.RUnlock()
+	s := scm.streams[id]
+	if s == nil {
+		panic("unregistered stream")
+	}
+	return s
+}
+
+func (scm *StreamCMap) Track(s *Stream) uintptr {
+	scm.Lock()
+	defer scm.Unlock()
+	s.id = scm.nextId
+	scm.nextId++
+	scm.streams[s.id] = s
+	return s.id
+}
+
+func (scm *StreamCMap) Untrack(id uintptr) {
+	scm.Lock()
+	defer scm.Unlock()
+	delete(scm.streams, id)
 }
