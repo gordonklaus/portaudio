@@ -21,6 +21,7 @@ import (
 	"os"
 	"reflect"
 	"runtime"
+	"sync"
 	"time"
 	"unsafe"
 )
@@ -433,6 +434,7 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 type Int24 [3]byte
 
 type Stream struct {
+	id                  uintptr
 	paStream            unsafe.Pointer
 	inParams, outParams *C.PaStreamParameters
 	in, out             *reflect.SliceHeader
@@ -441,6 +443,35 @@ type Stream struct {
 	args                []reflect.Value
 	callback            reflect.Value
 	closed              bool
+}
+
+// Since Go 1.6, if a Go pointer is passed to C then the Go memory it points to may not contain any Go pointers: https://golang.org/cmd/cgo/#hdr-Passing_pointers
+// To deal with this, we maintain an id-keyed map of active streams.
+var (
+	mu      sync.Mutex
+	streams = map[uintptr]*Stream{}
+	nextID  uintptr
+)
+
+func newStream() *Stream {
+	mu.Lock()
+	defer mu.Unlock()
+	s := &Stream{id: nextID}
+	streams[nextID] = s
+	nextID++
+	return s
+}
+
+func getStream(id uintptr) *Stream {
+	mu.Lock()
+	defer mu.Unlock()
+	return streams[id]
+}
+
+func delStream(s *Stream) {
+	mu.Lock()
+	defer mu.Unlock()
+	delete(streams, s.id)
 }
 
 /*
@@ -492,17 +523,19 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 		return nil, NotInitialized
 	}
 
-	s := &Stream{}
+	s := newStream()
 	err := s.init(p, args...)
 	if err != nil {
+		delStream(s)
 		return nil, err
 	}
 	cb := C.paStreamCallback
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s))
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s.id))
 	if paErr != C.paNoError {
+		delStream(s)
 		return nil, newError(paErr)
 	}
 	return s, nil
@@ -708,7 +741,9 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 func (s *Stream) Close() error {
 	if !s.closed {
 		s.closed = true
-		return newError(C.Pa_CloseStream(s.paStream))
+		err := newError(C.Pa_CloseStream(s.paStream))
+		delStream(s)
+		return err
 	}
 	return nil
 }
@@ -731,7 +766,7 @@ func streamCallback(inputBuffer, outputBuffer unsafe.Pointer, frames C.ulong, ti
 		}
 	}()
 
-	s := (*Stream)(userData)
+	s := getStream(uintptr(userData))
 	s.timeInfo = StreamCallbackTimeInfo{duration(timeInfo.inputBufferAdcTime), duration(timeInfo.currentTime), duration(timeInfo.outputBufferDacTime)}
 	s.flags = StreamCallbackFlags(statusFlags)
 	updateBuffer(s.in, uintptr(inputBuffer), s.inParams, int(frames))
