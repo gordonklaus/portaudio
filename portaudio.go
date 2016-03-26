@@ -448,7 +448,7 @@ type Stream struct {
 // Since Go 1.6, if a Go pointer is passed to C then the Go memory it points to may not contain any Go pointers: https://golang.org/cmd/cgo/#hdr-Passing_pointers
 // To deal with this, we maintain an id-keyed map of active streams.
 var (
-	mu      sync.Mutex
+	mu      sync.RWMutex
 	streams = map[uintptr]*Stream{}
 	nextID  uintptr
 )
@@ -463,8 +463,8 @@ func newStream() *Stream {
 }
 
 func getStream(id uintptr) *Stream {
-	mu.Lock()
-	defer mu.Unlock()
+	mu.RLock()
+	defer mu.RUnlock()
 	return streams[id]
 }
 
