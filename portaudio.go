@@ -1,4 +1,6 @@
 /*
+Package portaudio applies Go bindings to the PortAudio library.
+
 For the most part, these bindings parallel the underlying PortAudio API; please refer to http://www.portaudio.com/docs.html for details.  Differences introduced by the bindings are documented here:
 
 Instead of passing a flag to OpenStream, audio sample formats are inferred from the signature of the stream callback or, for a blocking stream, from the types of the buffers.  See the StreamCallback and Buffer types for details.
@@ -26,20 +28,24 @@ import (
 	"unsafe"
 )
 
+// Version returns the release number of PortAudio.
 func Version() int {
 	return int(C.Pa_GetVersion())
 }
 
+// VersionText returns the textual description of the PortAudio release.
 func VersionText() string {
 	return C.GoString(C.Pa_GetVersionText())
 }
 
+// Error wraps over PaError.
 type Error C.PaError
 
 func (err Error) Error() string {
 	return C.GoString(C.Pa_GetErrorText(C.PaError(err)))
 }
 
+// PortAudio Errors.
 const (
 	NotInitialized                        Error = C.paNotInitialized
 	InvalidChannelCount                   Error = C.paInvalidChannelCount
@@ -71,6 +77,7 @@ const (
 	BadBufferPtr                          Error = C.paBadBufferPtr
 )
 
+// UnanticipatedHostError contains details for ApiHost related errors.
 type UnanticipatedHostError struct {
 	HostApiType HostApiType
 	Code        int
@@ -98,6 +105,16 @@ func newError(err C.PaError) error {
 
 var initialized = 0
 
+// Initialize initializes internal data structures and
+// prepares underlying host APIs for use. With the exception
+// of Version(), VersionText(), and ErrorText(), this function
+// MUST be called before using any other PortAudio API functions.
+//
+// If Initialize() is called multiple times, each successful call
+// must be matched with a corresponding call to Terminate(). Pairs of
+// calls to Initialize()/Terminate() may overlap, and are not required to be fully nested.
+//
+// Note that if Initialize() returns an error code, Terminate() should NOT be called.
 func Initialize() error {
 	paErr := C.Pa_Initialize()
 	if paErr != C.paNoError {
@@ -107,6 +124,17 @@ func Initialize() error {
 	return nil
 }
 
+// Terminate deallocates all resources allocated by PortAudio
+// since it was initialized by a call to Initialize().
+//
+// In cases where Initialize() has been called multiple times,
+// each call must be matched with a corresponding call to Pa_Terminate().
+// The final matching call to Pa_Terminate() will automatically
+// close any PortAudio streams that are still open..
+//
+// Terminate MUST be called before exiting a program which uses PortAudio.
+// Failure to do so may result in serious resource leaks, such as audio devices
+// not being available until the next reboot.
 func Terminate() error {
 	paErr := C.Pa_Terminate()
 	if paErr != C.paNoError {
@@ -120,6 +148,7 @@ func Terminate() error {
 	return nil
 }
 
+// HostApiType maps ints to HostApi modes.
 type HostApiType int
 
 func (t HostApiType) String() string {
@@ -143,6 +172,7 @@ var hostApiStrings = [...]string{
 	AudioScienceHPI: "AudioScienceHPI",
 }
 
+// PortAudio Api types.
 const (
 	InDevelopment   HostApiType = C.paInDevelopment
 	DirectSound     HostApiType = C.paDirectSound
@@ -160,6 +190,7 @@ const (
 	AudioScienceHPI HostApiType = C.paAudioScienceHPI
 )
 
+// HostApiInfo contains information for a HostApi.
 type HostApiInfo struct {
 	Type                HostApiType
 	Name                string
@@ -168,6 +199,7 @@ type HostApiInfo struct {
 	Devices             []*DeviceInfo
 }
 
+// DeviceInfo contains information for an audio device.
 type DeviceInfo struct {
 	index                    C.PaDeviceIndex
 	Name                     string
@@ -181,6 +213,7 @@ type DeviceInfo struct {
 	HostApi                  *HostApiInfo
 }
 
+// HostApis returns all information available for HostApis.
 func HostApis() ([]*HostApiInfo, error) {
 	hosts, _, err := hostsAndDevices()
 	if err != nil {
@@ -189,6 +222,7 @@ func HostApis() ([]*HostApiInfo, error) {
 	return hosts, nil
 }
 
+// HostApi returns information for a requested HostApiType.
 func HostApi(apiType HostApiType) (*HostApiInfo, error) {
 	hosts, err := HostApis()
 	if err != nil {
@@ -201,6 +235,10 @@ func HostApi(apiType HostApiType) (*HostApiInfo, error) {
 	return hosts[i], nil
 }
 
+// DefaultHostApi returns information of the default HostApi available on the system.
+//
+// The default host API will be the lowest common denominator host API
+// on the current platform and is unlikely to provide the best performance.
 func DefaultHostApi() (*HostApiInfo, error) {
 	hosts, err := HostApis()
 	if err != nil {
@@ -213,6 +251,7 @@ func DefaultHostApi() (*HostApiInfo, error) {
 	return hosts[i], nil
 }
 
+// Devices returns information for all available devices on the system.
 func Devices() ([]*DeviceInfo, error) {
 	_, devs, err := hostsAndDevices()
 	if err != nil {
@@ -221,6 +260,8 @@ func Devices() ([]*DeviceInfo, error) {
 	return devs, nil
 }
 
+// DefaultInputDevice returns information for the default
+// input device on the system.
 func DefaultInputDevice() (*DeviceInfo, error) {
 	devs, err := Devices()
 	if err != nil {
@@ -233,6 +274,8 @@ func DefaultInputDevice() (*DeviceInfo, error) {
 	return devs[i], nil
 }
 
+// DefaultOutputDevice returns information for the default
+// output device on the system.
 func DefaultOutputDevice() (*DeviceInfo, error) {
 	devs, err := Devices()
 	if err != nil {
@@ -245,7 +288,8 @@ func DefaultOutputDevice() (*DeviceInfo, error) {
 	return devs[i], nil
 }
 
-/* cache the HostApi/Device list to simplify the enumeration code.
+/*
+Cache the HostApi/Device list to simplify the enumeration code.
 Note that portaudio itself caches the lists, so these won't go stale.
 
 However, there is talk of extending the portaudio API to allow clients
@@ -322,9 +366,8 @@ func lookupDevice(d []*DeviceInfo, i C.PaDeviceIndex) *DeviceInfo {
 	return nil
 }
 
-/*
-StreamParameters includes all parameters required to open a stream except for the callback or buffers.
-*/
+// StreamParameters includes all parameters required to
+// open a stream except for the callback or buffers.
 type StreamParameters struct {
 	Input, Output   StreamDeviceParameters
 	SampleRate      float64
@@ -332,17 +375,20 @@ type StreamParameters struct {
 	Flags           StreamFlags
 }
 
-/*
-StreamDeviceParameters specifies parameters for one device (either input or output) in a stream.  A nil Device indicates that no device is to be used -- i.e., for an input- or output-only stream.
-*/
+// StreamDeviceParameters specifies parameters for
+// one device (either input or output) in a stream.
+// A nil Device indicates that no device is to be used
+// -- i.e., for an input- or output-only stream.
 type StreamDeviceParameters struct {
 	Device   *DeviceInfo
 	Channels int
 	Latency  time.Duration
 }
 
+// FramesPerBufferUnspecified ...
 const FramesPerBufferUnspecified = C.paFramesPerBufferUnspecified
 
+// StreamFlags ...
 type StreamFlags C.PaStreamFlags
 
 const (
@@ -354,9 +400,9 @@ const (
 	PlatformSpecificFlags                 StreamFlags = C.paPlatformSpecificFlags
 )
 
-/*
-High latency parameters are mono in, stereo out (if supported), high latency, the smaller of the default sample rates of the two devices, andFramesPerBufferUnspecified.  One of the devices may be nil.
-*/
+// HighLatencyParameters are mono in, stereo out (if supported),
+// high latency, the smaller of the default sample rates of the two devices,
+// and FramesPerBufferUnspecified.  One of the devices may be nil.
 func HighLatencyParameters(in, out *DeviceInfo) (p StreamParameters) {
 	sampleRate := 0.0
 	if in != nil {
@@ -386,9 +432,9 @@ func HighLatencyParameters(in, out *DeviceInfo) (p StreamParameters) {
 	return p
 }
 
-/*
-Low latency parameters are mono in, stereo out (if supported), low latency, the larger of the default sample rates of the two devices, and FramesPerBufferUnspecified.  One of the devices may be nil.
-*/
+// LowLatencyParameters are mono in, stereo out (if supported),
+// low latency, the larger of the default sample rates of the two devices,
+// and FramesPerBufferUnspecified.  One of the devices may be nil.
 func LowLatencyParameters(in, out *DeviceInfo) (p StreamParameters) {
 	sampleRate := 0.0
 	if in != nil {
@@ -418,10 +464,8 @@ func LowLatencyParameters(in, out *DeviceInfo) (p StreamParameters) {
 	return p
 }
 
-/*
-Returns nil if the format is supported, otherwise an error.
-The args parameter has the same meaning as in OpenStream.
-*/
+// IsFormatSupported Returns nil if the format is supported, otherwise an error.
+// The args parameter has the same meaning as in OpenStream.
 func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 	s := &Stream{}
 	err := s.init(p, args...)
@@ -431,8 +475,16 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 	return newError(C.Pa_IsFormatSupported(s.inParams, s.outParams, C.double(p.SampleRate)))
 }
 
+// Int24 ...
 type Int24 [3]byte
 
+// Stream provides access to audio hardware represented
+// by one or more PaDevices. Depending on the underlying
+// Host API, it may be possible to open multiple streams
+// using the same device, however this behavior is
+// implementation defined.
+//
+// Portable applications should assume that a Device may be simultaneously used by at most one Stream.
 type Stream struct {
 	id                  uintptr
 	paStream            unsafe.Pointer
@@ -445,8 +497,11 @@ type Stream struct {
 	closed              bool
 }
 
-// Since Go 1.6, if a Go pointer is passed to C then the Go memory it points to may not contain any Go pointers: https://golang.org/cmd/cgo/#hdr-Passing_pointers
-// To deal with this, we maintain an id-keyed map of active streams.
+/*
+Since Go 1.6, if a Go pointer is passed to C then the Go memory it points to
+may not contain any Go pointers: https://golang.org/cmd/cgo/#hdr-Passing_pointers
+To deal with this, we maintain an id-keyed map of active streams.
+*/
 var (
 	mu      sync.RWMutex
 	streams = map[uintptr]*Stream{}
@@ -475,7 +530,7 @@ func delStream(s *Stream) {
 }
 
 /*
-This type exists for documentation purposes only.
+StreamCallback exists for documentation purposes only.
 
 A StreamCallback is a func whose signature resembles
 
@@ -486,7 +541,7 @@ where the final one or two parameters may be omitted.  For an input- or output-o
 type StreamCallback interface{}
 
 /*
-This type exists for documentation purposes only.
+Buffer exists for documentation purposes only.
 
 A Buffer is of the form [][]SampleType or []SampleType
 where SampleType is float32, int32, Int24, int16, int8, or uint8.
@@ -499,25 +554,55 @@ len(buf) == numChannels * framesPerBuffer
 */
 type Buffer interface{}
 
+// StreamCallbackTimeInfo contains timing information for the
+// buffers passed to the stream callback.
 type StreamCallbackTimeInfo struct {
 	InputBufferAdcTime, CurrentTime, OutputBufferDacTime time.Duration
 }
 
+// StreamCallbackFlags are flag bit constants for the statusFlags to StreamCallback.
 type StreamCallbackFlags C.PaStreamCallbackFlags
 
+// PortAudio stream callback flags.
 const (
-	InputUnderflow  StreamCallbackFlags = C.paInputUnderflow
-	InputOverflow   StreamCallbackFlags = C.paInputOverflow
+	// In a stream opened with FramesPerBufferUnspecified,
+	// InputUnderflow indicates that input data is all silence (zeros)
+	// because no real data is available.
+	//
+	// In a stream opened without FramesPerBufferUnspecified,
+	// InputUnderflow indicates that one or more zero samples have been inserted
+	// into the input buffer to compensate for an input underflow.
+	InputUnderflow StreamCallbackFlags = C.paInputUnderflow
+
+	// In a stream opened with FramesPerBufferUnspecified,
+	// indicates that data prior to the first sample of the
+	// input buffer was discarded due to an overflow, possibly
+	// because the stream callback is using too much CPU time.
+	//
+	// Otherwise indicates that data prior to one or more samples
+	// in the input buffer was discarded.
+	InputOverflow StreamCallbackFlags = C.paInputOverflow
+
+	// Indicates that output data (or a gap) was inserted,
+	// possibly because the stream callback is using too much CPU time.
 	OutputUnderflow StreamCallbackFlags = C.paOutputUnderflow
-	OutputOverflow  StreamCallbackFlags = C.paOutputOverflow
-	PrimingOutput   StreamCallbackFlags = C.paPrimingOutput
+
+	// Indicates that output data will be discarded because no room is available.
+	OutputOverflow StreamCallbackFlags = C.paOutputOverflow
+
+	// Some of all of the output data will be used to prime the stream,
+	// input data may be zero.
+	PrimingOutput StreamCallbackFlags = C.paPrimingOutput
 )
 
-/*
-For an input- or output-only stream, p.Output.Device or p.Input.Device must be nil, respectively.
-
-The args may consist of either a single StreamCallback or, for a blocking stream, two Buffers or pointers to Buffers.  For an input- or output-only stream, one of the Buffer args may be omitted.
-*/
+// OpenStream creates an instance of a Stream.
+//
+// For an input- or output-only stream, p.Output.Device or p.Input.Device must be nil, respectively.
+//
+// The args may consist of either a single StreamCallback or,
+// for a blocking stream, two Buffers or pointers to Buffers.
+//
+// For an input- or output-only stream, one of the Buffer args may be omitted.
 func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if initialized <= 0 {
 		return nil, NotInitialized
@@ -541,9 +626,10 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	return s, nil
 }
 
-/*
-The args parameter has the same meaning as in OpenStream.
-*/
+// OpenDefaultStream is a simplified version of OpenStream that
+// opens the default input and/or output devices.
+//
+// The args parameter has the same meaning as in OpenStream.
 func OpenDefaultStream(numInputChannels, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (*Stream, error) {
 	if initialized <= 0 {
 		return nil, NotInitialized
@@ -738,6 +824,7 @@ func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStr
 	}
 }
 
+// Close terminates the stream.
 func (s *Stream) Close() error {
 	if !s.closed {
 		s.closed = true
@@ -748,6 +835,7 @@ func (s *Stream) Close() error {
 	return nil
 }
 
+// Start commences audio processing.
 func (s *Stream) Start() error {
 	return newError(C.Pa_StartStream(s.paStream))
 }
@@ -800,14 +888,19 @@ func setSlice(s *reflect.SliceHeader, data uintptr, n int) {
 	s.Cap = n
 }
 
+// Stop terminates audio processing. It waits until all pending
+// audio buffers have been played before it returns.
 func (s *Stream) Stop() error {
 	return newError(C.Pa_StopStream(s.paStream))
 }
 
+// Abort terminates audio processing immediately
+// without waiting for pending buffers to complete.
 func (s *Stream) Abort() error {
 	return newError(C.Pa_AbortStream(s.paStream))
 }
 
+// Info returns information about the Stream instance.
 func (s *Stream) Info() *StreamInfo {
 	i := C.Pa_GetStreamInfo(s.paStream)
 	if i == nil {
@@ -816,19 +909,34 @@ func (s *Stream) Info() *StreamInfo {
 	return &StreamInfo{duration(i.inputLatency), duration(i.outputLatency), float64(i.sampleRate)}
 }
 
+// StreamInfo contains information about the stream.
 type StreamInfo struct {
 	InputLatency, OutputLatency time.Duration
 	SampleRate                  float64
 }
 
+// Time returns the current time in seconds for a lifespan of a stream.
+// Starting and stopping the stream does not affect the passage of time.
 func (s *Stream) Time() time.Duration {
 	return duration(C.Pa_GetStreamTime(s.paStream))
 }
 
+// CpuLoad returns the CPU usage information for the specified stream,
+// where 0.0 is 0% usage and 1.0 is 100% usage.
+//
+// The "CPU Load" is a fraction of total CPU time consumed by a
+// callback stream's audio processing routines including,
+// but not limited to the client supplied stream callback.
+//
+// This function does not work with blocking read/write streams.
+//
+// This function may be called from the stream callback function or the application.
 func (s *Stream) CpuLoad() float64 {
 	return float64(C.Pa_GetStreamCpuLoad(s.paStream))
 }
 
+// AvailableToRead returns the number of frames that
+// can be read from the stream without waiting.
 func (s *Stream) AvailableToRead() (int, error) {
 	n := C.Pa_GetStreamReadAvailable(s.paStream)
 	if n < 0 {
@@ -837,6 +945,8 @@ func (s *Stream) AvailableToRead() (int, error) {
 	return int(n), nil
 }
 
+// AvailableToWrite returns the number of frames that
+// can be written from the stream without waiting.
 func (s *Stream) AvailableToWrite() (int, error) {
 	n := C.Pa_GetStreamWriteAvailable(s.paStream)
 	if n < 0 {
@@ -845,9 +955,8 @@ func (s *Stream) AvailableToWrite() (int, error) {
 	return int(n), nil
 }
 
-/*
-Read uses the buffer provided to OpenStream.  The number of samples to read is determined by the size of the buffer.
-*/
+// Read uses the buffer provided to OpenStream.
+// The number of samples to read is determined by the size of the buffer.
 func (s *Stream) Read() error {
 	if s.callback.IsValid() {
 		return CanNotReadFromACallbackStream
@@ -862,9 +971,8 @@ func (s *Stream) Read() error {
 	return newError(C.Pa_ReadStream(s.paStream, buf, C.ulong(frames)))
 }
 
-/*
-Write uses the buffer provided to OpenStream.  The number of samples to write is determined by the size of the buffer.
-*/
+// Write uses the buffer provided to OpenStream.
+// The number of samples to write is determined by the size of the buffer.
 func (s *Stream) Write() error {
 	if s.callback.IsValid() {
 		return CanNotWriteToACallbackStream
