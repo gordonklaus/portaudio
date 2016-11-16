@@ -595,7 +595,7 @@ const (
 	PrimingOutput StreamCallbackFlags = C.paPrimingOutput
 )
 
-// OpenStream crates an instance of a Stream.
+// OpenStream creates an instance of a Stream.
 //
 // For an input- or output-only stream, p.Output.Device or p.Input.Device must be nil, respectively.
 //
