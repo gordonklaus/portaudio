@@ -475,8 +475,28 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 	return newError(C.Pa_IsFormatSupported(s.inParams, s.outParams, C.double(p.SampleRate)))
 }
 
-// Int24 is a 24-bit signed integer with little-endian byte order.
+// Int24 holds the bytes of a 24-bit signed integer in native byte order.
 type Int24 [3]byte
+
+// PutInt32 puts the three most significant bytes of i32 into i24.
+func (i24 *Int24) PutInt32(i32 int32) {
+	if littleEndian {
+		i24[0] = byte(i32 >> 8)
+		i24[1] = byte(i32 >> 16)
+		i24[2] = byte(i32 >> 24)
+	} else {
+		i24[2] = byte(i32 >> 8)
+		i24[1] = byte(i32 >> 16)
+		i24[0] = byte(i32 >> 24)
+	}
+}
+
+var littleEndian bool
+
+func init() {
+	x := 1
+	littleEndian = *(*byte)(unsafe.Pointer(&x)) == 1
+}
 
 // Stream provides access to audio hardware represented
 // by one or more PaDevices. Depending on the underlying
