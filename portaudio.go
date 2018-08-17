@@ -475,7 +475,7 @@ func IsFormatSupported(p StreamParameters, args ...interface{}) error {
 	return newError(C.Pa_IsFormatSupported(s.inParams, s.outParams, C.double(p.SampleRate)))
 }
 
-// Int24 ...
+// Int24 is a 24-bit signed integer with little-endian byte order.
 type Int24 [3]byte
 
 // Stream provides access to audio hardware represented
