@@ -1,14 +1,3 @@
-/*
-Package portaudio applies Go bindings to the PortAudio library.
-
-For the most part, these bindings parallel the underlying PortAudio API; please refer to http://www.portaudio.com/docs.html for details.  Differences introduced by the bindings are documented here:
-
-Instead of passing a flag to OpenStream, audio sample formats are inferred from the signature of the stream callback or, for a blocking stream, from the types of the buffers.  See the StreamCallback and Buffer types for details.
-
-Blocking I/O:  Read and Write do not accept buffer arguments; instead they use the buffers (or pointers to buffers) provided to OpenStream.  The number of samples to read or write is determined by the size of the buffers.
-
-The StreamParameters struct combines parameters for both the input and the output device as well as the sample rate, buffer size, and flags.
-*/
 package portaudio
 
 /*
@@ -101,51 +90,6 @@ func newError(err C.PaError) error {
 		return nil
 	}
 	return Error(err)
-}
-
-var initialized = 0
-
-// Initialize initializes internal data structures and
-// prepares underlying host APIs for use. With the exception
-// of Version(), VersionText(), and ErrorText(), this function
-// MUST be called before using any other PortAudio API functions.
-//
-// If Initialize() is called multiple times, each successful call
-// must be matched with a corresponding call to Terminate(). Pairs of
-// calls to Initialize()/Terminate() may overlap, and are not required to be fully nested.
-//
-// Note that if Initialize() returns an error code, Terminate() should NOT be called.
-func Initialize() error {
-	paErr := C.Pa_Initialize()
-	if paErr != C.paNoError {
-		return newError(paErr)
-	}
-	initialized++
-	return nil
-}
-
-// Terminate deallocates all resources allocated by PortAudio
-// since it was initialized by a call to Initialize().
-//
-// In cases where Initialize() has been called multiple times,
-// each call must be matched with a corresponding call to Pa_Terminate().
-// The final matching call to Pa_Terminate() will automatically
-// close any PortAudio streams that are still open..
-//
-// Terminate MUST be called before exiting a program which uses PortAudio.
-// Failure to do so may result in serious resource leaks, such as audio devices
-// not being available until the next reboot.
-func Terminate() error {
-	paErr := C.Pa_Terminate()
-	if paErr != C.paNoError {
-		return newError(paErr)
-	}
-	initialized--
-	if initialized <= 0 {
-		initialized = 0
-		cached = false
-	}
-	return nil
 }
 
 // HostApiType maps ints to HostApi modes.
@@ -624,7 +568,7 @@ const (
 //
 // For an input- or output-only stream, one of the Buffer args may be omitted.
 func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
-	if initialized <= 0 {
+	if !isInitialized() {
 		return nil, NotInitialized
 	}
 
@@ -651,7 +595,7 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 //
 // The args parameter has the same meaning as in OpenStream.
 func OpenDefaultStream(numInputChannels, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (*Stream, error) {
-	if initialized <= 0 {
+	if !isInitialized() {
 		return nil, NotInitialized
 	}
 
