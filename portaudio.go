@@ -894,10 +894,9 @@ func updateBuffer(buf *reflect.SliceHeader, p uintptr, params *C.PaStreamParamet
 }
 
 func setChannels(s *reflect.SliceHeader, p uintptr, frames int) {
-	sp := s.Data
 	for i := 0; i < s.Len; i++ {
-		setSlice((*reflect.SliceHeader)(unsafe.Pointer(sp)), *(*uintptr)(unsafe.Pointer(p)), frames)
-		sp += unsafe.Sizeof(reflect.SliceHeader{})
+		buf := unsafe.Pointer(uintptr(unsafe.Pointer(s.Data)) + unsafe.Sizeof(reflect.SliceHeader{})*uintptr(i))
+		setSlice((*reflect.SliceHeader)(buf), *(*uintptr)(unsafe.Pointer(p)), frames)
 		p += unsafe.Sizeof(uintptr(0))
 	}
 }
