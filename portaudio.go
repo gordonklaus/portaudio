@@ -42,6 +42,12 @@ func VersionText() string {
 type Error C.PaError
 
 func (err Error) Error() string {
+	if err == NoDefaultInputDevice {
+		return "no default input device"
+	}
+	if err == NoDefaultOutputDevice {
+		return "no default output device"
+	}
 	return C.GoString(C.Pa_GetErrorText(C.PaError(err)))
 }
 
@@ -75,6 +81,8 @@ const (
 	CanNotWriteToAnInputOnlyStream        Error = C.paCanNotWriteToAnInputOnlyStream
 	IncompatibleStreamHostApi             Error = C.paIncompatibleStreamHostApi
 	BadBufferPtr                          Error = C.paBadBufferPtr
+	NoDefaultInputDevice                  Error = -1
+	NoDefaultOutputDevice                 Error = -2
 )
 
 // UnanticipatedHostError contains details for ApiHost related errors.
@@ -268,6 +276,9 @@ func DefaultInputDevice() (*DeviceInfo, error) {
 		return nil, err
 	}
 	i := C.Pa_GetDefaultInputDevice()
+	if i == C.paNoDevice {
+		return nil, NoDefaultInputDevice
+	}
 	if i < 0 {
 		return nil, newError(C.PaError(i))
 	}
@@ -282,6 +293,9 @@ func DefaultOutputDevice() (*DeviceInfo, error) {
 		return nil, err
 	}
 	i := C.Pa_GetDefaultOutputDevice()
+	if i == C.paNoDevice {
+		return nil, NoDefaultOutputDevice
+	}
 	if i < 0 {
 		return nil, newError(C.PaError(i))
 	}
