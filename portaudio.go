@@ -1033,16 +1033,14 @@ func getBuffer(s *reflect.SliceHeader, p *C.PaStreamParameters) (unsafe.Pointer,
 		}
 		buf := make([]uintptr, s.Len)
 		frames := -1
-		sp := s.Data
 		for i := range buf {
-			ch := (*reflect.SliceHeader)(unsafe.Pointer(sp))
+			ch := (*reflect.SliceHeader)(unsafe.Add(unsafe.Pointer(s.Data), uintptr(i)*unsafe.Sizeof(reflect.SliceHeader{})))
 			if frames == -1 {
 				frames = ch.Len
 			} else if ch.Len != frames {
 				return nil, 0, fmt.Errorf("channels have different lengths")
 			}
 			buf[i] = ch.Data
-			sp += unsafe.Sizeof(reflect.SliceHeader{})
 		}
 		return unsafe.Pointer(&buf[0]), frames, nil
 	}
