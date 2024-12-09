@@ -209,7 +209,7 @@ type HostApiInfo struct {
 
 // DeviceInfo contains information for an audio device.
 type DeviceInfo struct {
-	index                    C.PaDeviceIndex
+	Index                    int
 	Name                     string
 	MaxInputChannels         int
 	MaxOutputChannels        int
@@ -333,7 +333,7 @@ func hostsAndDevices() ([]*HostApiInfo, []*DeviceInfo, error) {
 			i := C.PaDeviceIndex(i)
 			paDev := C.Pa_GetDeviceInfo(i)
 			devices[i] = &DeviceInfo{
-				index:                    i,
+				Index:                    int(i),
 				Name:                     C.GoString(paDev.name),
 				MaxInputChannels:         int(paDev.maxInputChannels),
 				MaxOutputChannels:        int(paDev.maxOutputChannels),
@@ -851,7 +851,7 @@ func sampleFormat(b reflect.Type) (f C.PaSampleFormat) {
 
 func paStreamParameters(p StreamDeviceParameters, fmt C.PaSampleFormat) *C.PaStreamParameters {
 	return &C.PaStreamParameters{
-		device:           p.Device.index,
+		device:           C.int(p.Device.Index),
 		channelCount:     C.int(p.Channels),
 		sampleFormat:     fmt,
 		suggestedLatency: C.PaTime(p.Latency.Seconds()),
