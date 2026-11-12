@@ -14,6 +14,8 @@ package portaudio
 /*
 #cgo pkg-config: portaudio-2.0
 #include <portaudio.h>
+#include <stdint.h>
+static inline void *streamUserData(uintptr_t id) { return (void *)id; }
 extern PaStreamCallback* paStreamCallback;
 */
 import "C"
@@ -652,7 +654,7 @@ func OpenStream(p StreamParameters, args ...interface{}) (*Stream, error) {
 	if !s.callback.IsValid() {
 		cb = nil
 	}
-	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, unsafe.Pointer(s.id))
+	paErr := C.Pa_OpenStream(&s.paStream, s.inParams, s.outParams, C.double(p.SampleRate), C.ulong(p.FramesPerBuffer), C.PaStreamFlags(p.Flags), cb, C.streamUserData(C.uintptr_t(s.id)))
 	if paErr != C.paNoError {
 		delStream(s)
 		return nil, newError(paErr)
